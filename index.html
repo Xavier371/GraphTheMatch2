@@ -1,52 +1,106 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Graph The Match</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="stylesheet" type="text/css" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Slope Field Game</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <!-- Math.js and Numeric.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.5.0/math.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
 </head>
 <body>
-    <div class="controls">
-        <button id="toggleInstructions">Instructions</button>
-        <button id="resetGraph">Reset</button>
-        <button id="checkMatching">Check</button>
-        <label>Set A Size: <input type="number" id="setASize" min="2" max="4" value="2"></label>
-        <label>Set B Size: <input type="number" id="setBSize" min="2" max="5" value="3"></label>
-    </div>
+    <div class="container">
+        <header class="app-header">
+            <h1>Slope Field Game</h1>
+            <p class="subtitle">Enter y' = f(x, y) and guide the red curve through both yellow targets.</p>
+        </header>
 
-    <div class="score-display">
-        <div class="score-item">
-            Current Score: <span id="currentScore">0.00</span>
+        <!-- Timer -->
+        <div class="game-stats">
+            <span class="stat-label">TIME</span>
+            <span class="stat-value" id="timer-display">0:00</span>
         </div>
-        <div class="score-item">
-            Max Score: <span id="maxScore">?</span>
-        </div>
-    </div>
-    <div id="winMessage" style="display: none;"></div>
 
-    <div id="canvasContainer">
-        <canvas id="gameCanvas"></canvas>
-        <div class="instructions-overlay">
-            <div class="instructions-content">
-                <p>A matching is a set of edges such that no two edges share a common vertex. Find the matching that maximizes the sum of weights</p>
-                <h2>Intuition</h2>
-                <ul>
-                    <li>Set A (red) is job applicants, Set B (blue) is companies. The edge weights [0,1] represent how suitable a person is for the job they applied to</li>
-                    <li>Red and and blue are two friend groups. Each edge weight represents the compatibility score between people of each group</li>
-                    <li>Set A is people calling an Uber, B is the drivers. Weights represents how convenient it is for the driver to pick up each passenger</li>
-                </ul>
-                <h2>Instructions</h2>
-                <ul>
-                    <li>Click and drag nodes to move them around</li>
-                    <li>Click on the edges to select/unselect them in the matching</li>
-                    <li>Use the Check button to verify if your matching is optimal</li>
-                    <li>Use Reset to start over with new random weights</li>
-                    <li>Change the number of nodes in each set on the top right</li>
-                </ul>
-                <button id="closeInstructions" class="close-button">Close</button>
+        <div class="controls">
+            <div class="input-group">
+                <span class="input-label">y' =</span>
+                <div class="input-math-wrapper">
+                    <input type="text" id="equation" value="x" placeholder="e.g., x + y, sin(x), x^2 - y"
+                           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                    <div id="eq-overlay" class="eq-overlay"></div>
+                </div>
+            </div>
+            <div class="button-row">
+                <button id="reset" class="btn btn-reset"   type="button">↺ Reset</button>
+                <button id="solve" class="btn btn-solve"   type="button">Solve</button>
+                <button id="help"  class="btn btn-help"    type="button">?</button>
+            </div>
+
+            <div id="error-message"   class="message message-error"></div>
+            <div id="success-message" class="message message-success"></div>
+            <div id="notice-message"  class="message message-notice"></div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="vector-field-canvas" width="480" height="480"></canvas>
+        </div>
+
+        <!-- Help modal -->
+        <div id="help-overlay" class="modal-overlay" aria-hidden="true">
+            <div class="modal" role="dialog" aria-labelledby="help-title" aria-modal="true">
+                <h2 id="help-title">How to Play</h2>
+
+                <div class="help-block">
+                    <p class="help-heading">What is a slope field?</p>
+                    <p>
+                        A slope field for y' = f(x, y) draws a short arrow at every grid point
+                        (x, y) showing the direction any solution curve must travel.
+                    </p>
+                </div>
+
+                <div class="help-block">
+                    <p class="help-heading">The red curve</p>
+                    <p>
+                        The red curve is a particular solution of y' = f(x, y) starting
+                        at the red dot, traced in both directions.
+                    </p>
+                </div>
+
+                <div class="help-block">
+                    <p class="help-heading">Your goal</p>
+                    <p>
+                        Find f(x, y) so the curve exits through <strong>both</strong> yellow
+                        boundary segments. When solved, press <strong>↺ Reset</strong> for a new puzzle.
+                    </p>
+                </div>
+
+                <div class="help-block">
+                    <p class="help-heading">Supported syntax</p>
+                    <p>Variables x and y · operators +, -, *, /, ^ · functions sin, cos, tan, exp, ln, sqrt, etc.</p>
+                    <p class="help-examples">
+                        Try: x &nbsp;·&nbsp; -y &nbsp;·&nbsp; x+y &nbsp;·&nbsp; x^2-y &nbsp;·&nbsp; sin(x)*cos(y)
+                    </p>
+                </div>
+
+                <div class="help-block">
+                    <p class="help-heading">Solve button</p>
+                    <p>
+                        Stuck? Press <strong>Solve</strong> and the game will find a simple f(x, y) that works.
+                    </p>
+                </div>
+
+                <div class="button-row" style="margin-top:18px;">
+                    <button id="close-help" class="btn btn-reset" type="button">Close</button>
+                </div>
             </div>
         </div>
     </div>
-    <script src="game.js"></script>
+
+    <script src="script.js"></script>
 </body>
 </html>
